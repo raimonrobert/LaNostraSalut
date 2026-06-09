@@ -1,0 +1,25 @@
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporales
+*.tmp
+*.bak
+*.orig
+
+# Node (por si acaso)
+node_modules/
+npm-debug.log*
+
+# Backups locales
+*.backup.html
+*_old.html
+*_bak.html
