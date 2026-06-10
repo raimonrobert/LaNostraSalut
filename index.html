@@ -27,6 +27,7 @@
   --urgencies: #e85b5b;
 
   --warn: #f59e0b;
+  --ok: #32c992;
   --pend-c: #4e5572;
   --assi-c: #5b9cf6;
   --real-c: #32c992;
@@ -161,6 +162,60 @@ details summary::-webkit-details-marker { display:none; }
 .spill[data-st=pendent]   { background:color-mix(in srgb,var(--pend-c) 12%,transparent); color:var(--pend-c); }
 .spill[data-st=assignada] { background:color-mix(in srgb,var(--assi-c) 12%,transparent); color:var(--assi-c); }
 .spill[data-st=realitzada]{ background:color-mix(in srgb,var(--real-c) 12%,transparent); color:var(--real-c); }
+
+/* ── Disponibilitat (Impossible / Potser / Acompanyo) ── */
+.avail-row { display:flex; gap:6px; flex-wrap:wrap; width:100%; }
+.avail-btn {
+  flex:1; min-width:74px; padding:7px 8px; border-radius:8px; border:1px solid var(--bd);
+  background:var(--s2); color:var(--mu2); font-size:12px; font-weight:700;
+  cursor:pointer; transition:all .15s; text-align:center; white-space:nowrap;
+}
+.avail-btn[data-av=impossible].on { border-color:var(--urgencies); color:var(--urgencies); background:color-mix(in srgb,var(--urgencies) 14%,transparent); }
+.avail-btn[data-av=potser].on     { border-color:var(--warn); color:var(--warn); background:color-mix(in srgb,var(--warn) 14%,transparent); }
+.avail-btn[data-av=acompanyo].on  { border-color:var(--ok,var(--assi-c)); color:var(--ok,var(--assi-c)); background:color-mix(in srgb,var(--ok,var(--assi-c)) 14%,transparent); }
+.avail-btn:hover:not(.on) { border-color:var(--bd2); color:var(--tx); }
+
+/* Badge "no cal acompanyant" */
+.no-comp-badge {
+  font-size:13px; font-weight:700; padding:5px 12px; border-radius:6px;
+  background:color-mix(in srgb,var(--mu2) 12%,transparent); color:var(--mu2);
+  display:flex; align-items:center; gap:6px;
+}
+
+/* Resum disponibilitat al detall */
+.avail-summary { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.avail-srow { display:flex; align-items:center; gap:10px; background:var(--s2); border-radius:10px; padding:9px 14px; }
+.avail-snm  { flex:1; font-size:14px; font-weight:600; }
+.avail-stag { font-size:11px; font-weight:700; padding:3px 9px; border-radius:5px; letter-spacing:.04em; text-transform:uppercase; }
+.avail-stag.impossible { background:color-mix(in srgb,var(--urgencies) 14%,transparent); color:var(--urgencies); }
+.avail-stag.potser     { background:color-mix(in srgb,var(--warn) 14%,transparent); color:var(--warn); }
+.avail-stag.acompanyo  { background:color-mix(in srgb,var(--ok,var(--assi-c)) 14%,transparent); color:var(--ok,var(--assi-c)); }
+.avail-stag.cap        { background:color-mix(in srgb,var(--mu) 14%,transparent); color:var(--mu); }
+
+/* Toggle "no necessita acompanyant" */
+.no-comp-toggle {
+  display:flex; align-items:center; gap:10px; background:var(--s2);
+  border:1px solid var(--bd2); border-radius:10px; padding:12px 14px; cursor:pointer;
+  margin-bottom:10px; transition:all .15s;
+}
+.no-comp-toggle.on { border-color:color-mix(in srgb,var(--mu2) 50%,transparent); background:color-mix(in srgb,var(--mu2) 8%,transparent); }
+.no-comp-checkbox {
+  width:20px; height:20px; border-radius:5px; border:2px solid var(--bd2);
+  flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800;
+}
+.no-comp-toggle.on .no-comp-checkbox { background:var(--mu2); border-color:var(--mu2); color:var(--bg); }
+.no-comp-txt { font-size:14px; font-weight:600; flex:1; }
+
+/* Select gran "Qui ets?" */
+.who-select {
+  width:100%; padding:18px 16px; border-radius:14px; background:var(--s2);
+  border:2px solid var(--bd2); color:var(--tx); font-size:18px; font-weight:700;
+  outline:none; appearance:none; cursor:pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%238890b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 16px center;
+}
+.who-select:focus { border-color: var(--pare); }
+.who-select option { background: var(--s2); color: var(--tx); }
 
 .name-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:4px; }
 
@@ -944,13 +999,13 @@ function renderList() {
   const all = appts.filter(a => {
     if (a.date < t0) return false;
     if (filter !== 'tots' && filter !== 'passades' && a.relative !== filter) return false;
-    if (filterCompanion === 'sense' && (a.companion || a.status === 'realitzada')) return false;
+    if (filterCompanion === 'sense' && (a.companion || a.status === 'realitzada' || a.no_companion_needed)) return false;
     if (filterCompanion !== 'tots' && filterCompanion !== 'sense' && a.companion !== filterCompanion) return false;
     return true;
   });
 
   // Banner de cites sense acompanyant (només quan filtre = Tots)
-  const pendingCount = appts.filter(a => a.date >= t0 && !a.companion && a.status !== 'realitzada').length;
+  const pendingCount = appts.filter(a => a.date >= t0 && !a.companion && a.status !== 'realitzada' && !a.no_companion_needed).length;
   const bannerHtml = (filterCompanion === 'tots' && filter === 'tots' && pendingCount > 0)
     ? `<div class="pending-banner" onclick="setFilterCompanionById('sense')">
         ⚠️ <strong>${pendingCount} cita${pendingCount>1?'es':''}</strong> sense acompanyant assignat
@@ -990,16 +1045,29 @@ function card(a, delay) {
   const noCmp = !a.companion;
   const isMe  = a.companion === myName;
   const showP = filter === 'tots';
+  const noNeed = !!a.no_companion_needed;
+  const myAvail = (a.availability || {})[myName] || '';
 
   const pTagHtml = showP
     ? `<span class="ptag" style="--c:${c}">${patIc(r.nom,c,'xs')} ${r.nom}</span>`
     : '';
 
-  const cmpHtml = noCmp
-    ? `<button class="btn-apunto" onclick="assignMe(event,'${a.id}')">+ M'apunto</button>`
-    : `<span class="companion-nm${isMe?' me':''}" >👤 ${a.companion}</span>`;
+  let cmpHtml;
+  if (noNeed) {
+    cmpHtml = `<span class="no-comp-badge">✓ No cal acompanyant</span>`;
+  } else if (!noCmp) {
+    cmpHtml = `<span class="companion-nm${isMe?' me':''}">👤 ${a.companion}</span>`;
+  } else {
+    cmpHtml = `<div class="avail-row" onclick="event.stopPropagation()">
+      ${[['impossible','Impossible'],['potser','Potser'],['acompanyo','Acompanyo']].map(([k,lbl]) =>
+        `<button class="avail-btn ${myAvail===k?'on':''}" data-av="${k}" onclick="setAvailability('${a.id}','${k}')">${lbl}</button>`
+      ).join('')}
+    </div>`;
+  }
 
-  return `<div class="card${noCmp && a.status!=='realitzada' ? ' unassigned' : ''}" onclick="openDetail('${a.id}')" style="animation-delay:${delay}ms">
+  const isUnassigned = noCmp && !noNeed && a.status!=='realitzada';
+
+  return `<div class="card${isUnassigned ? ' unassigned' : ''}" onclick="openDetail('${a.id}')" style="animation-delay:${delay}ms">
     <div class="card-strip" style="--c:${c}"></div>
     <div class="card-body">
       <div class="card-r1">
@@ -1018,15 +1086,36 @@ function card(a, delay) {
 }
 
 // ══════════════════════════════════════════════════════════
-// ASSIGN ME (quick action)
+// DISPONIBILITAT
 // ══════════════════════════════════════════════════════════
-async function assignMe(e, id) {
-  e.stopPropagation();
+async function setAvailability(id, val) {
   const { myName } = getCfg();
   if (!myName) { toast('⚙️ Configura el teu nom als ajustos'); return; }
-  await dbPatch(id, { companion: myName, status: 'assignada' });
+  const a = appts.find(x => x.id === id);
+  if (!a) return;
+  const availability = { ...(a.availability || {}) };
+
+  if (val === 'acompanyo') {
+    availability[myName] = 'acompanyo';
+    await dbPatch(id, { availability, companion: myName, status: 'assignada' });
+    toast(`✓ T'has apuntat com a acompanyant`);
+  } else {
+    availability[myName] = val;
+    await dbPatch(id, { availability });
+    toast(val === 'impossible' ? '✓ Marcat com a impossible' : '✓ Marcat com a "potser"');
+  }
   await loadAppts();
-  toast(`✓ T'has apuntat com a acompanyant`);
+}
+
+async function toggleNoCompanion(id) {
+  const a = appts.find(x => x.id === id);
+  if (!a) return;
+  const newVal = !a.no_companion_needed;
+  const patch = { no_companion_needed: newVal };
+  if (newVal) { patch.companion = null; patch.availability = {}; }
+  await dbPatch(id, patch);
+  await loadAppts();
+  openDetail(id);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1054,14 +1143,45 @@ function openDetail(id) {
   const color = r.color;
   const cfg = getCfg();
   const myName = cfg.myName || '';
-  const isMe = a.companion === myName;
+  const noNeed = !!a.no_companion_needed;
+  const availability = a.availability || {};
+  const myAvail = availability[myName] || '';
 
-  const cmpBlock = !a.companion
-    ? `<button class="btn-apunto-lg" onclick="assignMeDetail('${a.id}')">👆 M'apunto com a acompanyant</button>`
-    : `<div class="comp-block"><div class="comp-row">
-        <div class="comp-av">👤</div>
-        <div><div class="comp-nm${isMe?' me':''}">${a.companion}</div><div class="comp-lbl">Acompanyant assignat</div></div>
-       </div></div>`;
+  const AV_LBL = { impossible:'Impossible', potser:'Potser', acompanyo:'Acompanyo' };
+
+  const noCompToggle = `
+    <div class="no-comp-toggle${noNeed?' on':''}" onclick="toggleNoCompanion('${a.id}')">
+      <div class="no-comp-checkbox">${noNeed?'✓':''}</div>
+      <div class="no-comp-txt">Aquesta cita no necessita acompanyant</div>
+    </div>`;
+
+  let companionSection = '';
+  if (!noNeed) {
+    const cmpBlock = !a.companion
+      ? `<div class="avail-row" style="margin-bottom:10px">
+          ${[['impossible','Impossible'],['potser','Potser'],['acompanyo','Acompanyo']].map(([k,lbl]) =>
+            `<button class="avail-btn ${myAvail===k?'on':''}" data-av="${k}" onclick="setAvailability('${a.id}','${k}')">${lbl}</button>`
+          ).join('')}
+        </div>`
+      : `<div class="comp-block" style="margin-bottom:10px"><div class="comp-row">
+          <div class="comp-av">👤</div>
+          <div><div class="comp-nm${a.companion===myName?' me':''}">${a.companion}</div><div class="comp-lbl">Acompanyant assignat</div></div>
+         </div></div>`;
+
+    const allCompanions = getCompanions();
+    const summaryRows = allCompanions.map(name => {
+      const av = availability[name] || (a.companion === name ? 'acompanyo' : '');
+      const cls = av || 'cap';
+      const lbl = AV_LBL[av] || 'Sense respondre';
+      return `<div class="avail-srow"><span class="avail-snm">${name}</span><span class="avail-stag ${cls}">${lbl}</span></div>`;
+    }).join('');
+
+    companionSection = `
+    <div class="det-slbl">Acompanyant</div>
+    ${cmpBlock}
+    <div class="det-slbl">Disponibilitat de tothom</div>
+    <div class="avail-summary">${summaryRows}</div>`;
+  }
 
   const notesPre = a.notes_pre
     ? `<div class="det-slbl">Notes prèvies</div>
@@ -1101,14 +1221,15 @@ function openDetail(id) {
       ${a.doctor    ? `<div class="det-field"><div class="det-flbl">Metge/Metgessa</div><div class="det-fval">${a.doctor}</div></div>` : ''}
     </div>
     ${a.center ? `<div class="det-full" style="margin-bottom:8px"><div class="det-flbl">Centre / Ubicació</div><div style="font-size:14px;font-weight:600;margin-top:4px">📍 ${a.center}</div></div>` : ''}
-    <div class="det-slbl">Acompanyant</div>
-    ${cmpBlock}
     <div class="det-slbl">Estat</div>
-    <div class="st-sel" style="margin-bottom:4px">
+    <div class="st-sel" style="margin-bottom:14px">
       ${['pendent','assignada','realitzada'].map(s =>
         `<button class="stbtn ${a.status===s?'on':''}" data-st="${s}" onclick="chStatus('${a.id}','${s}',this)">${ST_LBL[s]}</button>`
       ).join('')}
     </div>
+    <div class="det-slbl">Acompanyant</div>
+    ${noCompToggle}
+    ${companionSection}
     ${notesPre}
     ${notesPost}
     ${addPostNotes}
@@ -1116,15 +1237,6 @@ function openDetail(id) {
       <button class="btn-ghost" style="flex:1" onclick="openForm('${a.id}')">✏️ Editar</button>
       <button class="btn-del" onclick="askDelete('${a.id}')">🗑️</button>
     </div>`);
-}
-
-async function assignMeDetail(id) {
-  const { myName } = getCfg();
-  if (!myName) { toast('⚙️ Configura el teu nom als ajustos'); return; }
-  await dbPatch(id, { companion: myName, status: 'assignada' });
-  await loadAppts();
-  closeSheet();
-  toast(`✓ T'has apuntat com a acompanyant`);
 }
 
 async function chStatus(id, status, btn) {
@@ -1202,7 +1314,11 @@ function openForm(id) {
     </div>
 
     <div class="fg"><label class="fl">Acompanyant</label>
-      <select class="fi" id="f-cmp">
+      <div class="no-comp-toggle${a?.no_companion_needed?' on':''}" id="f-noneed-toggle" onclick="toggleFormNoNeed()">
+        <div class="no-comp-checkbox">${a?.no_companion_needed?'✓':''}</div>
+        <div class="no-comp-txt">Aquesta cita no necessita acompanyant</div>
+      </div>
+      <select class="fi" id="f-cmp" ${a?.no_companion_needed?'disabled':''}>
         <option value="">Sense assignar</option>
         ${sibOpts}
       </select>
@@ -1239,10 +1355,20 @@ function selGroup(btn, cls) {
   btn.classList.add('on');
 }
 
+function toggleFormNoNeed() {
+  const t = document.getElementById('f-noneed-toggle');
+  const sel = document.getElementById('f-cmp');
+  const on = t.classList.toggle('on');
+  t.querySelector('.no-comp-checkbox').textContent = on ? '✓' : '';
+  sel.disabled = on;
+  if (on) sel.value = '';
+}
+
 async function submitForm() {
   const pBtn  = document.querySelector('.pbtn.on');
   const cvBtn = document.querySelector('.cvbtn.on');
   const stBtn = document.querySelector('.stbtn.on');
+  const noNeed = document.getElementById('f-noneed-toggle')?.classList.contains('on') || false;
 
   if (!pBtn) { toast('⚠️ Selecciona una persona'); return; }
   const date = document.getElementById('f-date').value;
@@ -1257,10 +1383,12 @@ async function submitForm() {
     doctor:     document.getElementById('f-doc').value.trim()   || null,
     center:     document.getElementById('f-ctr').value.trim()   || null,
     notes_pre:  document.getElementById('f-npre').value.trim()  || null,
-    companion:  document.getElementById('f-cmp').value          || null,
+    companion:  noNeed ? null : (document.getElementById('f-cmp').value || null),
+    no_companion_needed: noNeed,
     status:     stBtn?.dataset.st                           || 'pendent',
     notes_post: document.getElementById('f-npost').value.trim() || null
   };
+  if (noNeed) payload.availability = {};
 
   const result = await dbSave(payload);
   if (result) {
@@ -1409,11 +1537,8 @@ function renderSetup() {
   el.style.display = 'flex';
   const sibs = SIBLINGS.length ? SIBLINGS : (getCfg().siblings || []);
 
-  const nameUI = sibs.length
-    ? `<div class="name-grid">
-        ${sibs.map(n => `<button type="button" class="name-btn" onclick="pickName('${n}',this)">${n}</button>`).join('')}
-       </div>`
-    : `<input type="text" class="fi" id="su-me" placeholder="El teu nom" autocomplete="name">`;
+  const options = `<option value="" disabled selected>Selecciona el teu nom...</option>` +
+    sibs.map(n => `<option value="${n}">${n}</option>`).join('');
 
   el.innerHTML = `<div class="setup-box">
     <div class="setup-logo">
@@ -1423,26 +1548,24 @@ function renderSetup() {
     </div>
     <div class="setup-sec">
       <div class="setup-sec-t">Qui ets?</div>
-      ${nameUI}
+      <select class="who-select" id="su-select" onchange="onWhoSelect(this)">
+        ${options}
+      </select>
     </div>
-    <button class="btn-pri" style="width:100%;margin-top:16px" id="su-btn" ${sibs.length?'disabled':''} onclick="saveSetup()">
-      Entrar →
+    <button class="btn-pri" style="width:100%;margin-top:16px" id="su-btn" disabled onclick="saveSetup()">
+      Continuar →
     </button>
   </div>`;
 }
 
-let _setupName = '';
-function pickName(name, btn) {
-  _setupName = name;
-  document.querySelectorAll('.name-btn').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
+function onWhoSelect(sel) {
   const sb = document.getElementById('su-btn');
-  if (sb) sb.disabled = false;
+  if (sb) sb.disabled = !sel.value;
 }
 
 async function saveSetup() {
-  const myName = _setupName || document.getElementById('su-me')?.value.trim();
-  if (!myName) { toast('⚠️ Selecciona o escriu el teu nom'); return; }
+  const myName = document.getElementById('su-select')?.value;
+  if (!myName) { toast('⚠️ Selecciona el teu nom'); return; }
   setCfg({ ...getCfg(), myName, siblings: SIBLINGS.length ? SIBLINGS : getCfg().siblings });
   const ok = await initDB();
   if (!ok) { toast('❌ No s\'ha pogut connectar a Supabase. Revisa les credencials al fitxer.'); return; }
