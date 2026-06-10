@@ -26,6 +26,7 @@
   --privat:    #f4b942;
   --urgencies: #e85b5b;
 
+  --warn: #f59e0b;
   --pend-c: #4e5572;
   --assi-c: #5b9cf6;
   --real-c: #32c992;
@@ -81,9 +82,20 @@ details summary::-webkit-details-marker { display:none; }
   cursor:pointer; white-space:nowrap; transition:all .18s; flex-shrink:0;
   display:flex; align-items:center; gap:6px;
 }
-.pill.on { background:var(--s3); border-color:var(--bd2); color:var(--tx); }
-.pill.on.pc { border-color:var(--c); color:var(--c); background:color-mix(in srgb,var(--c) 12%,transparent); }
-.pill.on[data-f=passades]{ border-color:var(--mu2); color:var(--mu2); background:color-mix(in srgb,var(--mu2) 12%,transparent); }
+.pill.on { 
+  background: var(--tx); border-color: var(--tx); color: var(--bg); 
+  font-weight: 800;
+  box-shadow: 0 3px 10px rgba(0,0,0,.35);
+}
+.pill.on.pc { 
+  background: var(--c); border-color: var(--c); color: #0b0d14; 
+  font-weight: 800;
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.pill.on[data-f=passades] { 
+  background: var(--mu2); border-color: var(--mu2); color: var(--bg); 
+  font-weight: 800;
+}
 
 /* ══ LIST ═════════════════════════════════════════════════ */
 #list { flex:1; min-height: 0; overflow-y: scroll; -webkit-overflow-scrolling: touch; padding:14px 14px 90px; overscroll-behavior: contain; }
@@ -151,6 +163,53 @@ details summary::-webkit-details-marker { display:none; }
 .spill[data-st=realitzada]{ background:color-mix(in srgb,var(--real-c) 12%,transparent); color:var(--real-c); }
 
 .name-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:4px; }
+
+/* Cards sense acompanyant — destacat visual */
+.card.unassigned {
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 4%, var(--s1));
+}
+.card.unassigned .btn-apunto {
+  background: color-mix(in srgb, var(--warn) 15%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 50%, transparent);
+  color: var(--warn); font-size:14px; font-weight:800; padding:7px 14px;
+  animation: pulse-warn 2.5s ease infinite;
+}
+@keyframes pulse-warn {
+  0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb,var(--warn) 35%,transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb,var(--warn) 0%,transparent); }
+}
+
+/* Pill warn "Sense assignar" */
+.pill.pill-warn:not(.on) { color:var(--warn); border-color:color-mix(in srgb,var(--warn) 35%,transparent); }
+.pill.pill-warn.on { 
+  background: var(--warn); border-color: var(--warn); color: #0b0d14; 
+  font-weight: 800;
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--warn) 45%, transparent);
+}
+
+/* Pills fila 2 */
+.pills-row2 { display:flex; gap:6px; padding: 0 16px 10px; overflow-x:auto; border-bottom:1px solid var(--bd); }
+.pills-row2::-webkit-scrollbar { display:none; }
+
+/* Etiquetes de fila */
+.pills-wrap { position:relative; }
+.pills-lbl {
+  font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--mu); padding: 8px 16px 4px; display:block;
+}
+
+/* Banner cites sense acompanyant */
+.pending-banner {
+  display:flex; align-items:center; gap:8px;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: 12px; padding: 12px 16px; margin-bottom: 14px;
+  font-size: 14px; font-weight: 600; color: var(--warn);
+  cursor: pointer; transition: background .2s;
+}
+.pending-banner:hover { background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.banner-cta { margin-left:auto; font-size:13px; font-weight:700; }
 .name-btn {
   padding:14px 10px; border-radius:12px; border:2px solid var(--bd);
   background:var(--s2); color:var(--mu2); font-size:15px; font-weight:700;
@@ -473,7 +532,10 @@ select.fi { cursor:pointer; appearance:none; }
           <button class="btn-cfg" onclick="openSettings()">⚙️</button>
         </div>
       </div>
+      <span class="pills-lbl">Pacient</span>
       <div class="pills" id="pills-container"></div>
+      <span class="pills-lbl">Acompanyant</span>
+      <div class="pills-row2" id="pills-companion"></div>
     </div>
     <main id="list"></main>
     <div id="calendar"></div>
@@ -561,6 +623,30 @@ function renderPills() {
     `<button class="pill ${filter==='passades'?'on':''}" data-f="passades" onclick="setFilter(this)">🗂 Passades</button>`;
 }
 function applyPatientNames() { renderPills(); }
+
+function renderCompanionPills() {
+  const el = document.getElementById('pills-companion');
+  if (!el) return;
+  const companions = getCompanions();
+  el.innerHTML =
+    `<button class="pill ${filterCompanion==='tots'?'on':''}" data-fc="tots" onclick="setFilterCompanion(this)">Tots</button>` +
+    `<button class="pill pill-warn ${filterCompanion==='sense'?'on':''}" data-fc="sense" onclick="setFilterCompanion(this)">⚠️ Sense assignar</button>` +
+    companions.map(c =>
+      `<button class="pill ${filterCompanion===c?'on':''}" data-fc="${c}" onclick="setFilterCompanion(this)">👤 ${c}</button>`
+    ).join('');
+}
+
+function setFilterCompanionById(fc) {
+  filterCompanion = fc;
+  renderCompanionPills();
+  renderList();
+}
+function setFilterCompanion(btn) {
+  filterCompanion = btn.dataset.fc;
+  renderCompanionPills();
+  if (viewMode === 'list') renderList();
+  else renderCalendar();
+}
 const COV_LBL = { lameva:'LaMevaSalut', mutua:'Mútua Privada', privat:'Privat', urgencies:'Urgències' };
 const COV_SHORT = { lameva:'LMS', mutua:'Mútua', privat:'Privat', urgencies:'URG' };
 const ST_LBL  = { pendent:'Pendent', assignada:'Assignat', realitzada:'Realitzada' };
@@ -598,11 +684,12 @@ create policy "open" on appointments
 let db          = null;
 let appts       = [];
 let filter      = 'tots';
-let editingId   = null;
-let deleteId    = null;
-let viewMode    = 'list';
-let calYear     = new Date().getFullYear();
-let calMonth    = new Date().getMonth();
+let editingId      = null;
+let deleteId       = null;
+let viewMode       = 'list';
+let calYear        = new Date().getFullYear();
+let calMonth       = new Date().getMonth();
+let filterCompanion = 'tots'; // 'tots' | 'sense' | nom de l'acompanyant
 
 // ══════════════════════════════════════════════════════════
 // SETTINGS
@@ -855,15 +942,27 @@ function renderList() {
 
   // Filtres normals — només cites d'avui en endavant
   const all = appts.filter(a => {
-    if (a.date < t0) return false; // mai mostrar passades aquí
-    return filter === 'tots' || a.relative === filter;
+    if (a.date < t0) return false;
+    if (filter !== 'tots' && filter !== 'passades' && a.relative !== filter) return false;
+    if (filterCompanion === 'sense' && (a.companion || a.status === 'realitzada')) return false;
+    if (filterCompanion !== 'tots' && filterCompanion !== 'sense' && a.companion !== filterCompanion) return false;
+    return true;
   });
+
+  // Banner de cites sense acompanyant (només quan filtre = Tots)
+  const pendingCount = appts.filter(a => a.date >= t0 && !a.companion && a.status !== 'realitzada').length;
+  const bannerHtml = (filterCompanion === 'tots' && filter === 'tots' && pendingCount > 0)
+    ? `<div class="pending-banner" onclick="setFilterCompanionById('sense')">
+        ⚠️ <strong>${pendingCount} cita${pendingCount>1?'es':''}</strong> sense acompanyant assignat
+        <span class="banner-cta">Veure →</span>
+       </div>`
+    : '';
 
   if (!all.length) {
     const hasPast = appts.some(a => a.date < t0);
-    el.innerHTML = `<div class="empty">
+    el.innerHTML = bannerHtml + `<div class="empty">
       <div class="empty-ic">📅</div>
-      <div class="empty-t">Sense cites properes</div>
+      <div class="empty-t">Sense cites${filterCompanion==='sense'?' sense assignar':filterCompanion!=='tots'?' per a '+filterCompanion:' properes'}</div>
       <div class="empty-s">${hasPast ? 'Les cites anteriors les trobaràs al filtre 🗂 Passades' : 'Prem ＋ per afegir la primera cita'}</div>
     </div>`;
     return;
@@ -873,7 +972,7 @@ function renderList() {
   const byDate = {};
   upcoming.forEach(a => { (byDate[a.date] = byDate[a.date] || []).push(a); });
 
-  el.innerHTML = Object.entries(byDate)
+  el.innerHTML = bannerHtml + Object.entries(byDate)
     .map(([date, list], gi) => `<div class="date-group">
       <div class="date-hdr">${hdrDate(date)}</div>
       ${list.map((a,i) => card(a,(gi*10+i)*30)).join('')}
@@ -900,7 +999,7 @@ function card(a, delay) {
     ? `<button class="btn-apunto" onclick="assignMe(event,'${a.id}')">+ M'apunto</button>`
     : `<span class="companion-nm${isMe?' me':''}" >👤 ${a.companion}</span>`;
 
-  return `<div class="card" onclick="openDetail('${a.id}')" style="animation-delay:${delay}ms">
+  return `<div class="card${noCmp && a.status!=='realitzada' ? ' unassigned' : ''}" onclick="openDetail('${a.id}')" style="animation-delay:${delay}ms">
     <div class="card-strip" style="--c:${c}"></div>
     <div class="card-body">
       <div class="card-r1">
@@ -1373,7 +1472,7 @@ async function init() {
     return;
   }
   const ok = await initDB();
-  if (ok) { renderPills(); await loadAppts(); }
+  if (ok) { renderPills(); renderCompanionPills(); await loadAppts(); }
   else toast('❌ Error de connexió amb Supabase');
 }
 
