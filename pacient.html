@@ -171,6 +171,29 @@ input,select,textarea,button { font-family:inherit; }
 textarea.fi { resize:vertical; min-height:82px; line-height:1.6; }
 .frow { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 
+/* Form pacient - camps grans i pas a pas */
+.fl-big { font-size:18px; font-weight:800; color:var(--tx); display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.fl-num {
+  width:30px; height:30px; border-radius:50%; background:var(--accent); color:#0b0d14;
+  display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; flex-shrink:0;
+}
+.fi-big {
+  width:100%; padding:18px; border-radius:14px; background:var(--s2);
+  border:2px solid var(--bd2); color:var(--tx); font-size:19px; font-weight:600; outline:none;
+}
+.fi-big:focus { border-color:var(--accent); }
+.fg-big { margin-bottom:22px; }
+
+.optional-toggle {
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:14px; margin-bottom:18px;
+  background:var(--s2); border:1px solid var(--bd); border-radius:12px;
+  color:var(--mu2); font-size:15px; font-weight:700; cursor:pointer; transition:all .2s;
+}
+.optional-toggle:hover { color:var(--tx); border-color:var(--bd2); }
+.optional-section { display:none; }
+.optional-section.on { display:block; animation: up .3s ease both; }
+
 .cov-sel { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
 .cvbtn {
   padding:11px; border-radius:9px; border:1px solid var(--bd);
@@ -562,43 +585,63 @@ function openForm(id) {
   editingId = id || null;
   const a = id ? appts.find(x => x.id === id) : null;
   const defCov = a ? (a.coverage||'lameva') : 'lameva';
+  const hasOptional = !!(a?.specialty || a?.doctor || a?.notes_pre);
 
   openSheet(`
     <div class="sh-hdr">
       <div class="sh-ttl">${id ? 'Editar cita' : 'Nova cita'}</div>
       <button class="btn-x" onclick="closeSheet()">✕</button>
     </div>
-    <div class="frow">
-      <div class="fg"><label class="fl">Data</label>
-        <input type="date" class="fi" id="f-date" value="${a?.date||today()}">
-      </div>
-      <div class="fg"><label class="fl">Hora</label>
-        <input type="time" class="fi" id="f-time" value="${a?.time||''}">
-      </div>
+
+    <div class="fg-big">
+      <div class="fl-big"><span class="fl-num">1</span> Quin dia és la cita?</div>
+      <input type="date" class="fi-big" id="f-date" value="${a?.date||today()}">
     </div>
-    <div class="fg"><label class="fl">Cobertura</label>
-      <div class="cov-sel">
-        ${Object.entries(COV_LBL).map(([k,v]) =>
-          `<button type="button" class="cvbtn ${defCov===k?'on':''}" data-cov="${k}" onclick="selCov(this)">${v}</button>`
-        ).join('')}
+
+    <div class="fg-big">
+      <div class="fl-big"><span class="fl-num">2</span> A quina hora?</div>
+      <input type="time" class="fi-big" id="f-time" value="${a?.time||''}">
+    </div>
+
+    <div class="fg-big">
+      <div class="fl-big"><span class="fl-num">3</span> On és?</div>
+      <input type="text" class="fi-big" id="f-ctr" placeholder="CAP, Hospital, Policlínica..." value="${a?.center||''}">
+    </div>
+
+    <div class="optional-toggle" id="opt-toggle" onclick="toggleOptional()">
+      <span id="opt-icon">▼</span> <span id="opt-label">${hasOptional?'Amaga els detalls extra':'Vols afegir més detalls? (opcional)'}</span>
+    </div>
+
+    <div class="optional-section${hasOptional?' on':''}" id="opt-section">
+      <div class="fg"><label class="fl">Cobertura</label>
+        <div class="cov-sel">
+          ${Object.entries(COV_LBL).map(([k,v]) =>
+            `<button type="button" class="cvbtn ${defCov===k?'on':''}" data-cov="${k}" onclick="selCov(this)">${v}</button>`
+          ).join('')}
+        </div>
       </div>
-    </div>
-    <div class="fg"><label class="fl">Especialitat</label>
-      <input type="text" class="fi" id="f-spec" placeholder="Cardiologia, Traumatologia..." value="${a?.specialty||''}">
-      <div class="qspecs">${SPECS.map(s=>`<button type="button" class="qsp" onclick="document.getElementById('f-spec').value='${s}'">${s}</button>`).join('')}</div>
-    </div>
-    <div class="frow">
+      <div class="fg"><label class="fl">Especialitat</label>
+        <input type="text" class="fi" id="f-spec" placeholder="Cardiologia, Traumatologia..." value="${a?.specialty||''}">
+        <div class="qspecs">${SPECS.map(s=>`<button type="button" class="qsp" onclick="document.getElementById('f-spec').value='${s}'">${s}</button>`).join('')}</div>
+      </div>
       <div class="fg"><label class="fl">Metge/essa</label>
         <input type="text" class="fi" id="f-doc" placeholder="Dr. Puig..." value="${a?.doctor||''}">
       </div>
-      <div class="fg"><label class="fl">Centre</label>
-        <input type="text" class="fi" id="f-ctr" placeholder="CAP, Hospital..." value="${a?.center||''}">
+      <div class="fg"><label class="fl">Notes</label>
+        <textarea class="fi" id="f-npre" placeholder="Portar analítica, dejú...">${a?.notes_pre||''}</textarea>
       </div>
     </div>
-    <div class="fg"><label class="fl">Notes prèvies</label>
-      <textarea class="fi" id="f-npre" placeholder="Portar analítica, dejú...">${a?.notes_pre||''}</textarea>
-    </div>
+
     <button type="button" class="btn-pri" onclick="submitForm()">${id?'✓ Guardar canvis':'+ Afegir cita'}</button>`);
+}
+
+function toggleOptional() {
+  const sec = document.getElementById('opt-section');
+  const icon = document.getElementById('opt-icon');
+  const lbl = document.getElementById('opt-label');
+  const on = sec.classList.toggle('on');
+  icon.textContent = on ? '▲' : '▼';
+  lbl.textContent = on ? 'Amaga els detalls extra' : 'Vols afegir més detalls? (opcional)';
 }
 
 function selCov(btn) {
@@ -608,16 +651,22 @@ function selCov(btn) {
 
 async function submitForm() {
   const date = document.getElementById('f-date')?.value;
-  if (!date) { toast('⚠️ La data és obligatòria'); return; }
+  const time = document.getElementById('f-time')?.value;
+  const center = document.getElementById('f-ctr')?.value.trim();
+
+  if (!date)   { toast('⚠️ Falta el dia de la cita'); return; }
+  if (!time)   { toast('⚠️ Falta l\'hora de la cita'); return; }
+  if (!center) { toast('⚠️ Falta el lloc de la cita'); return; }
+
   const covBtn = document.querySelector('.cvbtn.on');
   const payload = {
     relative:  myKey(),
     date,
-    time:      document.getElementById('f-time')?.value || null,
+    time,
     coverage:  covBtn?.dataset.cov || 'lameva',
     specialty: document.getElementById('f-spec')?.value.trim() || null,
     doctor:    document.getElementById('f-doc')?.value.trim() || null,
-    center:    document.getElementById('f-ctr')?.value.trim() || null,
+    center,
     notes_pre: document.getElementById('f-npre')?.value.trim() || null,
     status:    'pendent',
   };
