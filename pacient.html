@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>LaNostraSalut</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ══ TOKENS ═══════════════════════════════════════ */
+:root {
+  --bg:  #0b0d14; --s1: #11141e; --s2: #181c2a; --s3: #202436;
+  --bd:  #272d42; --bd2: #343c5a;
+  --tx:  #dde2f4; --mu: #555e80; --mu2: #8890b8;
+  --accent: #5b9cf6; /* sobreescrit per JS segons pacient */
+  --ok:   #32c992;
+  --warn: #f59e0b;
+  --lameva:    #32c992; --mutua: #9b71f5;
+  --privat:    #f4b942; --urgencies: #e85b5b;
+}
+*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; }
+body { font-family:'Bricolage Grotesque',sans-serif; background:var(--bg); color:var(--tx); font-size:18px; }
+input,select,textarea,button { font-family:inherit; }
+
+/* ══ SHELL ════════════════════════════════════════ */
+#app { height:100dvh; display:flex; flex-direction:column; max-width:480px; margin:0 auto; }
+
+/* ══ HEADER ══════════════════════════════════════ */
+#header {
+  background:var(--s1); border-bottom:1px solid var(--bd);
+  padding:16px 20px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.hdr-left { display:flex; align-items:center; gap:14px; }
+.pat-avatar-lg {
+  width:46px; height:46px; border-radius:50%;
+  background:var(--accent); color:#0b0d14;
+  font-size:22px; font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.hdr-name  { font-size:22px; font-weight:800; }
+.hdr-sub   { font-size:13px; color:var(--mu2); margin-top:1px; }
+.btn-cfg   {
+  background:var(--s2); border:1px solid var(--bd); color:var(--mu2);
+  border-radius:10px; padding:8px 12px; font-size:18px; cursor:pointer;
+}
+
+/* ══ LIST ════════════════════════════════════════ */
+#list { flex:1; min-height:0; overflow-y:scroll; -webkit-overflow-scrolling:touch; padding:18px 16px 100px; }
+
+.date-hdr {
+  font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--mu); margin:0 2px 10px; display:flex; align-items:center; gap:8px;
+}
+.date-hdr::after { content:''; flex:1; height:1px; background:var(--bd); }
+.date-group { margin-bottom:22px; }
+
+/* ══ CARD PACIENT ════════════════════════════════ */
+.pcard {
+  background:var(--s1); border:1px solid var(--bd);
+  border-radius:16px; padding:18px 20px; margin-bottom:10px;
+  cursor:pointer; transition:border-color .15s;
+  animation: up .25s ease both;
+}
+.pcard:active { transform:scale(.98); }
+.pcard:hover  { border-color:var(--bd2); }
+.pcard.today-card { border-color:color-mix(in srgb,var(--accent) 40%,transparent); background:color-mix(in srgb,var(--accent) 5%,var(--s1)); }
+
+.pc-top   { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; gap:10px; }
+.pc-date  { font-family:'DM Mono',monospace; font-size:15px; color:var(--mu2); }
+.pc-time  { font-family:'DM Mono',monospace; font-size:22px; font-weight:500; color:var(--tx); line-height:1; }
+.pc-cov   {
+  font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  padding:3px 8px; border-radius:5px; flex-shrink:0; margin-top:3px;
+}
+.cov-lameva    { background:color-mix(in srgb,var(--lameva) 15%,transparent);    color:var(--lameva); }
+.cov-mutua     { background:color-mix(in srgb,var(--mutua) 15%,transparent);     color:var(--mutua); }
+.cov-privat    { background:color-mix(in srgb,var(--privat) 15%,transparent);    color:var(--privat); }
+.cov-urgencies { background:color-mix(in srgb,var(--urgencies) 15%,transparent); color:var(--urgencies); }
+
+.pc-spec  { font-size:22px; font-weight:800; margin-bottom:4px; }
+.pc-sub   { font-size:15px; color:var(--mu2); margin-bottom:14px; }
+
+.pc-companion {
+  display:flex; align-items:center; gap:10px;
+  background:var(--s2); border-radius:10px; padding:12px 14px;
+}
+.pc-companion.assigned { background:color-mix(in srgb,var(--ok) 8%,transparent); border:1px solid color-mix(in srgb,var(--ok) 25%,transparent); }
+.pc-companion.pending  { background:color-mix(in srgb,var(--warn) 8%,transparent); border:1px solid color-mix(in srgb,var(--warn) 25%,transparent); }
+.pc-cmp-ic   { font-size:22px; }
+.pc-cmp-body { flex:1; }
+.pc-cmp-lbl  { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px; }
+.pc-cmp-lbl.assigned { color:var(--ok); }
+.pc-cmp-lbl.pending  { color:var(--warn); }
+.pc-cmp-nm   { font-size:17px; font-weight:700; }
+
+/* ══ EMPTY ════════════════════════════════════════ */
+.empty { text-align:center; padding:60px 24px; animation:up .4s ease both; }
+.empty-ic { font-size:56px; opacity:.25; margin-bottom:18px; }
+.empty-t  { font-size:18px; font-weight:700; color:var(--mu2); margin-bottom:8px; }
+.empty-s  { font-size:15px; color:var(--mu); line-height:1.6; }
+
+/* ══ PAST TOGGLE ══════════════════════════════════ */
+.past-btn {
+  width:100%; padding:14px; border:1px solid var(--bd); border-radius:14px;
+  background:transparent; color:var(--mu2); font-size:15px; font-weight:600;
+  cursor:pointer; margin-bottom:14px; transition:all .2s;
+}
+.past-btn:hover { border-color:var(--bd2); color:var(--tx); }
+
+/* ══ FAB ══════════════════════════════════════════ */
+.fab {
+  position:fixed; bottom:calc(env(safe-area-inset-bottom,0px)+20px); right:20px;
+  width:62px; height:62px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--accent); color:#fff; font-size:32px; z-index:20;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 8px 28px color-mix(in srgb,var(--accent) 50%,transparent);
+  transition:transform .2s;
+}
+.fab:active { transform:scale(.93); }
+@media(min-width:480px){ .fab { right:calc(50% - 220px); } }
+
+/* ══ OVERLAY + SHEET ══════════════════════════════ */
+#ov {
+  display:none; position:fixed; inset:0; z-index:30;
+  background:rgba(0,0,0,.65); backdrop-filter:blur(3px);
+}
+#ov.on { display:block; }
+#sheet {
+  position:fixed; bottom:0; left:50%; z-index:40;
+  width:min(480px,100%); max-height:92dvh;
+  transform:translateX(-50%) translateY(100%);
+  background:var(--s1); border:1px solid var(--bd2); border-bottom:none;
+  border-radius:22px 22px 0 0;
+  display:flex; flex-direction:column;
+  transition:transform .32s cubic-bezier(.32,1,.4,1);
+}
+#sheet.on { transform:translateX(-50%) translateY(0); }
+.sh-handle { width:36px; height:4px; background:var(--bd2); border-radius:2px; margin:12px auto 0; flex-shrink:0; }
+#sh-body { overflow-y:scroll; -webkit-overflow-scrolling:touch; flex:1; padding:16px 20px calc(env(safe-area-inset-bottom,0px)+24px); }
+
+/* ══ SHEET COMPONENTS ═════════════════════════════ */
+.sh-hdr  { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.sh-ttl  { font-size:20px; font-weight:800; }
+.btn-x   { background:var(--s2); border:1px solid var(--bd); color:var(--mu2); border-radius:8px; padding:7px 11px; font-size:18px; cursor:pointer; }
+
+/* Detail sheet */
+.det-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.det-f   { background:var(--s2); border-radius:10px; padding:12px 14px; }
+.det-fl  { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--mu); margin-bottom:4px; }
+.det-fv  { font-size:16px; font-weight:600; }
+.det-notes { background:var(--s2); border-radius:10px; padding:14px; margin-bottom:10px; }
+.det-notes-lbl { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--mu); margin-bottom:6px; }
+.det-notes-txt { font-size:15px; line-height:1.65; color:var(--mu2); }
+
+/* Form */
+.fg { margin-bottom:16px; }
+.fl { font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--mu); display:block; margin-bottom:6px; }
+.fi {
+  width:100%; padding:14px 16px; border-radius:10px; background:var(--s2);
+  border:1px solid var(--bd2); color:var(--tx); font-size:16px; outline:none;
+  transition:border-color .2s;
+}
+.fi:focus { border-color:var(--accent); }
+.fi::placeholder { color:var(--mu); }
+textarea.fi { resize:vertical; min-height:82px; line-height:1.6; }
+.frow { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+.cov-sel { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.cvbtn {
+  padding:11px; border-radius:9px; border:1px solid var(--bd);
+  background:var(--s2); color:var(--mu2); font-size:13px; font-weight:700;
+  cursor:pointer; transition:all .18s; text-align:center;
+}
+.cvbtn.on { border-color:var(--accent); color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); }
+
+.qspecs { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
+.qsp {
+  padding:5px 10px; border-radius:6px; border:1px solid var(--bd);
+  background:transparent; color:var(--mu2); font-size:12px; font-weight:600; cursor:pointer; transition:all .14s;
+}
+.qsp:hover { border-color:var(--bd2); color:var(--tx); background:var(--s3); }
+
+.btn-pri {
+  width:100%; padding:16px; border-radius:12px; border:none; cursor:pointer;
+  background:var(--accent); color:#0b0d14;
+  font-size:17px; font-weight:800; transition:opacity .2s; margin-top:20px;
+}
+.btn-pri:hover { opacity:.88; }
+
+/* Setup */
+#setup {
+  position:fixed; inset:0; background:var(--bg); z-index:100;
+  overflow-y:auto; padding:48px 24px 60px;
+  display:flex; align-items:center; justify-content:center;
+}
+.setup-box { width:100%; max-width:420px; }
+.setup-logo { text-align:center; margin-bottom:40px; }
+.setup-logo-ic {
+  width:80px; height:80px; border-radius:24px; margin:0 auto 16px;
+  background:var(--accent); display:flex; align-items:center; justify-content:center;
+  font-size:40px; box-shadow:0 12px 40px color-mix(in srgb,var(--accent) 35%,transparent);
+}
+.setup-t { font-size:30px; font-weight:800; margin-bottom:6px; }
+.setup-s { font-size:16px; color:var(--mu2); }
+.setup-sec-t {
+  font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--mu); margin:0 0 12px; display:flex; align-items:center; gap:8px;
+}
+.setup-sec-t::before { content:''; flex:0 0 20px; height:1px; background:var(--bd); }
+.setup-sec { margin-bottom:28px; }
+
+.pat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.pat-btn {
+  padding:20px 12px; border-radius:14px; border:2px solid var(--bd);
+  background:var(--s2); cursor:pointer; transition:all .2s;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+.pat-btn-ic {
+  width:52px; height:52px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px; font-weight:800; color:#0b0d14;
+}
+.pat-btn-nm { font-size:17px; font-weight:700; color:var(--mu2); }
+.pat-btn.on .pat-btn-nm { color:var(--tx); }
+
+/* Confirm modal */
+#confirm {
+  display:none; position:fixed; inset:0; z-index:60;
+  align-items:center; justify-content:center;
+  background:rgba(0,0,0,.72); backdrop-filter:blur(4px);
+}
+#confirm.on { display:flex; }
+.cfm-box { background:var(--s1); border:1px solid var(--bd2); border-radius:16px; padding:28px; width:min(340px,90vw); }
+.cfm-t { font-size:18px; font-weight:800; margin-bottom:8px; }
+.cfm-s { font-size:14px; color:var(--mu2); margin-bottom:22px; line-height:1.5; }
+.cfm-btns { display:flex; gap:8px; flex-direction:row-reverse; }
+.btn-ghost { padding:14px 16px; border-radius:10px; background:var(--s2); border:1px solid var(--bd2); color:var(--mu2); font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; }
+.btn-ghost:hover { color:var(--tx); }
+.btn-del { padding:14px 16px; border-radius:10px; background:color-mix(in srgb,var(--urgencies) 10%,transparent); border:1px solid color-mix(in srgb,var(--urgencies) 28%,transparent); color:var(--urgencies); font-size:14px; font-weight:700; cursor:pointer; }
+
+/* Toast */
+#toast {
+  position:fixed; bottom:calc(env(safe-area-inset-bottom,0px)+90px); left:50%;
+  transform:translateX(-50%) translateY(12px);
+  background:var(--s3); border:1px solid var(--bd2); border-radius:10px;
+  padding:11px 20px; font-size:14px; font-weight:600; color:var(--tx);
+  opacity:0; transition:all .25s; z-index:50; white-space:nowrap; pointer-events:none;
+}
+#toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+
+@keyframes up { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="main">
+    <div id="header">
+      <div class="hdr-left">
+        <div class="pat-avatar-lg" id="hdr-avatar">?</div>
+        <div>
+          <div class="hdr-name" id="hdr-name">—</div>
+          <div class="hdr-sub">Les meves cites</div>
+        </div>
+      </div>
+      <button class="btn-cfg" onclick="openSettings()">⚙️</button>
+    </div>
+    <main id="list"></main>
+    <button class="fab" onclick="openForm()">＋</button>
+  </div>
+
+  <div id="setup" style="display:none"></div>
+
+  <div id="ov" onclick="closeSheet()"></div>
+  <div id="sheet">
+    <div class="sh-handle"></div>
+    <div id="sh-body"></div>
+  </div>
+
+  <div id="confirm">
+    <div class="cfm-box">
+      <div class="cfm-t">Eliminar cita</div>
+      <div class="cfm-s">Segur que vols eliminar aquesta cita?</div>
+      <div class="cfm-btns">
+        <button class="btn-del" id="cfm-yes">Eliminar</button>
+        <button class="btn-ghost" onclick="closeConfirm()">Cancel·lar</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<script>
+'use strict';
+
+// ══ CONFIGURACIÓ ══════════════════════════════════
+const SUPABASE_URL = 'https://vzjyrdjdvbgqefqwekcs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6anlyZGpkdmJncWVmcXdla2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MzE0MDYsImV4cCI6MjA5NjUwNzQwNn0.B5xCOceo789RpOPr9kzUAReH2p2JFX9gd6--vxFkysc';
+
+const DEFAULT_PATIENTS = [
+  { key:'pare',  nom:'Pare'     },
+  { key:'mare',  nom:'Mare'     },
+  { key:'oncle', nom:'Onclu'    },
+  { key:'p4',    nom:'Mohammed' },
+];
+const PAL      = ['#5b9cf6','#f06ba0','#f59a3a','#2dd4bf','#c084fc','#34d399','#fb923c','#38bdf8'];
+const COV_LBL  = { lameva:'LaMevaSalut', mutua:'Mútua Privada', privat:'Privat', urgencies:'Urgències' };
+const COV_SHORT= { lameva:'LMS', mutua:'Mútua', privat:'Privat', urgencies:'URG' };
+const SPECS    = ['Medicina General','Cardiologia','Traumatologia','Oftalmologia','Neurologia','Oncologia','Pneumologia','Digestiu','Dermatologia','Endocrinologia','Urologia','Reumatologia','Psiquiatria','Rehabilitació','Geriatria'];
+const DAYS_CA  = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','dissabte'];
+const MONTHS_S = ['gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des'];
+const MONTHS_L = ['gener','febrer','març','abril','maig','juny','juliol','agost','setembre','octubre','novembre','desembre'];
+
+// ══ ESTAT ═════════════════════════════════════════
+let db       = null;
+let appts    = [];
+let showPast = false;
+let deleteId = null;
+let editingId = null;
+
+// ══ CONFIG LOCAL ══════════════════════════════════
+function getCfg() { try { return JSON.parse(localStorage.getItem('lns_pacient') || 'null') || {}; } catch { return {}; } }
+function setCfg(c) { localStorage.setItem('lns_pacient', JSON.stringify(c)); }
+
+function getPatients() { return getCfg().patientsList || DEFAULT_PATIENTS; }
+function myKey()   { return getCfg().myPatientKey || ''; }
+function myColor() {
+  const idx = getPatients().findIndex(p => p.key === myKey());
+  return PAL[idx >= 0 ? idx : 0];
+}
+function myName() {
+  const p = getPatients().find(p => p.key === myKey());
+  return p ? p.nom : '?';
+}
+function getInitial(nom) { return (nom||'?').trim().charAt(0).toUpperCase(); }
+
+function applyTheme() {
+  const c = myColor();
+  document.documentElement.style.setProperty('--accent', c);
+  const av = document.getElementById('hdr-avatar');
+  const nm = document.getElementById('hdr-name');
+  if (av) av.textContent = getInitial(myName());
+  if (nm) nm.textContent = myName();
+}
+
+// ══ SUPABASE ══════════════════════════════════════
+async function initDB() {
+  try {
+    db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    db.channel('pac_ch')
+      .on('postgres_changes', { event:'*', schema:'public', table:'appointments' }, () => loadAppts())
+      .subscribe();
+    return true;
+  } catch { return false; }
+}
+
+async function loadAppts() {
+  if (!db || !myKey()) return;
+  const { data, error } = await db.from('appointments')
+    .select('*')
+    .eq('relative', myKey())
+    .order('date').order('time');
+  if (!error && data) { appts = data; renderList(); }
+}
+
+async function dbSave(payload) {
+  if (!db) return null;
+  payload.updated_at = new Date().toISOString();
+  if (editingId) {
+    const { data, error } = await db.from('appointments').update(payload).eq('id', editingId).select().single();
+    if (error) { toast('❌ ' + (error.message||'Error')); return null; }
+    return data;
+  } else {
+    const { data, error } = await db.from('appointments').insert(payload).select().single();
+    if (error) { toast('❌ ' + (error.message||'Error')); return null; }
+    return data;
+  }
+}
+
+async function dbDelete(id) {
+  if (!db) return;
+  await db.from('appointments').delete().eq('id', id);
+}
+
+// ══ DATES ═════════════════════════════════════════
+const today = () => new Date().toISOString().slice(0,10);
+function shortDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return `${DAYS_CA[new Date(y,m-1,d).getDay()]} ${d} ${MONTHS_S[m-1]}`;
+}
+function fullDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return `${DAYS_CA[new Date(y,m-1,d).getDay()]}, ${d} de ${MONTHS_L[m-1]} de ${y}`;
+}
+function hdrDate(s) {
+  const t0 = today(), tm = new Date(Date.now()+86400000).toISOString().slice(0,10);
+  if (s===t0) return `Avui · ${shortDate(s)}`;
+  if (s===tm) return `Demà · ${shortDate(s)}`;
+  return shortDate(s);
+}
+
+// ══ RENDER LIST ═══════════════════════════════════
+function renderList() {
+  const el  = document.getElementById('list');
+  const t0  = today();
+  const upcoming = appts.filter(a => a.date >= t0).sort((a,b) => a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+  const past     = appts.filter(a => a.date <  t0).sort((a,b) => b.date.localeCompare(a.date));
+
+  if (!upcoming.length && !past.length) {
+    el.innerHTML = `<div class="empty">
+      <div class="empty-ic">📅</div>
+      <div class="empty-t">Sense cites programades</div>
+      <div class="empty-s">Prem ＋ per afegir una nova cita</div>
+    </div>`;
+    return;
+  }
+
+  const byDate = {};
+  upcoming.forEach(a => { (byDate[a.date]=byDate[a.date]||[]).push(a); });
+
+  let html = Object.entries(byDate).map(([date, list], gi) =>
+    `<div class="date-group">
+      <div class="date-hdr">${hdrDate(date)}</div>
+      ${list.map((a,i) => pcard(a,(gi*10+i)*30)).join('')}
+    </div>`
+  ).join('');
+
+  if (past.length) {
+    if (showPast) {
+      html += `<div class="date-group">
+        <div class="date-hdr">Cites anteriors</div>
+        ${past.map((a,i) => pcard(a,i*30)).join('')}
+      </div>
+      <button class="past-btn" onclick="togglePast()">▲ Amagar anteriors</button>`;
+    } else {
+      html += `<button class="past-btn" onclick="togglePast()">▼ ${past.length} cita${past.length>1?'es':''} anterior${past.length>1?'s':''}</button>`;
+    }
+  }
+
+  el.innerHTML = html;
+}
+
+function togglePast() { showPast = !showPast; renderList(); }
+
+// ══ CARD PACIENT ══════════════════════════════════
+function pcard(a, delay) {
+  const t0 = today();
+  const isToday = a.date === t0;
+  const covCls = `cov-${a.coverage||'lameva'}`;
+  const covLbl = COV_SHORT[a.coverage||'lameva'];
+
+  const companionHtml = a.companion
+    ? `<div class="pc-companion assigned">
+        <div class="pc-cmp-ic">👤</div>
+        <div class="pc-cmp-body">
+          <div class="pc-cmp-lbl assigned">Acompanyant</div>
+          <div class="pc-cmp-nm">${a.companion}</div>
+        </div>
+      </div>`
+    : `<div class="pc-companion pending">
+        <div class="pc-cmp-ic">⏳</div>
+        <div class="pc-cmp-body">
+          <div class="pc-cmp-lbl pending">Pendent d'assignar</div>
+          <div class="pc-cmp-nm" style="color:var(--mu2);font-size:15px">Els teus familiars s'hi apuntaran aviat</div>
+        </div>
+      </div>`;
+
+  return `<div class="pcard${isToday?' today-card':''}" onclick="openDetail('${a.id}')" style="animation-delay:${delay}ms">
+    <div class="pc-top">
+      <div>
+        <div class="pc-date">${shortDate(a.date)}</div>
+        <div class="pc-time">${a.time||'——:——'}</div>
+      </div>
+      <span class="pc-cov ${covCls}">${covLbl}</span>
+    </div>
+    <div class="pc-spec">${a.specialty||'<span style="color:var(--mu)">Sense especialitat</span>'}</div>
+    ${a.doctor||a.center ? `<div class="pc-sub">${[a.doctor,a.center].filter(Boolean).join(' · ')}</div>` : '<div style="margin-bottom:14px"></div>'}
+    ${companionHtml}
+  </div>`;
+}
+
+// ══ DETAIL SHEET ══════════════════════════════════
+function openDetail(id) {
+  editingId = id;
+  const a = appts.find(x => x.id === id);
+  if (!a) return;
+
+  const companionHtml = a.companion
+    ? `<div class="pc-companion assigned" style="margin-bottom:0">
+        <div class="pc-cmp-ic">👤</div>
+        <div class="pc-cmp-body">
+          <div class="pc-cmp-lbl assigned">Acompanyant confirmat</div>
+          <div class="pc-cmp-nm">${a.companion}</div>
+        </div>
+      </div>`
+    : `<div class="pc-companion pending" style="margin-bottom:0">
+        <div class="pc-cmp-ic">⏳</div>
+        <div class="pc-cmp-body">
+          <div class="pc-cmp-lbl pending">Pendent d'assignar</div>
+          <div class="pc-cmp-nm" style="color:var(--mu2);font-size:15px">Els teus familiars s'hi apuntaran aviat</div>
+        </div>
+      </div>`;
+
+  const notesPre = a.notes_pre
+    ? `<div class="det-notes"><div class="det-notes-lbl">Notes prèvies</div><div class="det-notes-txt">${a.notes_pre}</div></div>` : '';
+  const notesPost = a.status==='realitzada' && a.notes_post
+    ? `<div class="det-notes"><div class="det-notes-lbl">Resum de la visita</div><div class="det-notes-txt">${a.notes_post}</div></div>` : '';
+
+  openSheet(`
+    <div class="sh-hdr">
+      <div class="sh-ttl">${fullDate(a.date)}</div>
+      <button class="btn-x" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="det-row">
+      <div class="det-f"><div class="det-fl">Hora</div><div class="det-fv" style="font-family:'DM Mono',monospace">${a.time||'—'}</div></div>
+      <div class="det-f"><div class="det-fl">Cobertura</div><div class="det-fv"><span class="pc-cov cov-${a.coverage||'lameva'}">${COV_LBL[a.coverage||'lameva']}</span></div></div>
+      ${a.specialty?`<div class="det-f"><div class="det-fl">Especialitat</div><div class="det-fv">${a.specialty}</div></div>`:''}
+      ${a.doctor?`<div class="det-f"><div class="det-fl">Metge/essa</div><div class="det-fv">${a.doctor}</div></div>`:''}
+    </div>
+    ${a.center?`<div class="det-notes" style="margin-bottom:10px"><div class="det-notes-lbl">Centre</div><div class="det-notes-txt" style="font-size:16px;font-weight:600">📍 ${a.center}</div></div>`:''}
+    ${notesPre}
+    ${notesPost}
+    <div style="margin-top:14px">${companionHtml}</div>
+    <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--bd)">
+      <button class="btn-ghost" style="flex:1" onclick="openForm('${a.id}')">✏️ Editar</button>
+      <button class="btn-del" onclick="askDelete('${a.id}')">🗑️</button>
+    </div>`);
+}
+
+// ══ FORM SHEET ════════════════════════════════════
+function openForm(id) {
+  editingId = id || null;
+  const a = id ? appts.find(x => x.id === id) : null;
+  const defCov = a ? (a.coverage||'lameva') : 'lameva';
+
+  openSheet(`
+    <div class="sh-hdr">
+      <div class="sh-ttl">${id ? 'Editar cita' : 'Nova cita'}</div>
+      <button class="btn-x" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Data</label>
+        <input type="date" class="fi" id="f-date" value="${a?.date||today()}">
+      </div>
+      <div class="fg"><label class="fl">Hora</label>
+        <input type="time" class="fi" id="f-time" value="${a?.time||''}">
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Cobertura</label>
+      <div class="cov-sel">
+        ${Object.entries(COV_LBL).map(([k,v]) =>
+          `<button type="button" class="cvbtn ${defCov===k?'on':''}" data-cov="${k}" onclick="selCov(this)">${v}</button>`
+        ).join('')}
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Especialitat</label>
+      <input type="text" class="fi" id="f-spec" placeholder="Cardiologia, Traumatologia..." value="${a?.specialty||''}">
+      <div class="qspecs">${SPECS.map(s=>`<button type="button" class="qsp" onclick="document.getElementById('f-spec').value='${s}'">${s}</button>`).join('')}</div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Metge/essa</label>
+        <input type="text" class="fi" id="f-doc" placeholder="Dr. Puig..." value="${a?.doctor||''}">
+      </div>
+      <div class="fg"><label class="fl">Centre</label>
+        <input type="text" class="fi" id="f-ctr" placeholder="CAP, Hospital..." value="${a?.center||''}">
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Notes prèvies</label>
+      <textarea class="fi" id="f-npre" placeholder="Portar analítica, dejú...">${a?.notes_pre||''}</textarea>
+    </div>
+    <button type="button" class="btn-pri" onclick="submitForm()">${id?'✓ Guardar canvis':'+ Afegir cita'}</button>`);
+}
+
+function selCov(btn) {
+  document.querySelectorAll('.cvbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+
+async function submitForm() {
+  const date = document.getElementById('f-date')?.value;
+  if (!date) { toast('⚠️ La data és obligatòria'); return; }
+  const covBtn = document.querySelector('.cvbtn.on');
+  const payload = {
+    relative:  myKey(),
+    date,
+    time:      document.getElementById('f-time')?.value || null,
+    coverage:  covBtn?.dataset.cov || 'lameva',
+    specialty: document.getElementById('f-spec')?.value.trim() || null,
+    doctor:    document.getElementById('f-doc')?.value.trim() || null,
+    center:    document.getElementById('f-ctr')?.value.trim() || null,
+    notes_pre: document.getElementById('f-npre')?.value.trim() || null,
+    status:    'pendent',
+  };
+  const result = await dbSave(payload);
+  if (result) {
+    await loadAppts();
+    closeSheet();
+    toast(editingId ? '✓ Cita actualitzada' : '✓ Cita afegida');
+  }
+}
+
+// ══ DELETE ════════════════════════════════════════
+function askDelete(id) {
+  deleteId = id;
+  closeSheet();
+  setTimeout(() => document.getElementById('confirm').classList.add('on'), 220);
+  document.getElementById('cfm-yes').onclick = async () => {
+    await dbDelete(deleteId);
+    await loadAppts();
+    closeConfirm();
+    toast('✓ Cita eliminada');
+  };
+}
+function closeConfirm() { document.getElementById('confirm').classList.remove('on'); }
+
+// ══ SETTINGS ══════════════════════════════════════
+function openSettings() {
+  const pts = getPatients();
+  openSheet(`
+    <div class="sh-hdr">
+      <div class="sh-ttl">Canviar usuari</div>
+      <button class="btn-x" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="pat-grid">
+      ${pts.map((p,i) => {
+        const c = PAL[i%PAL.length];
+        return `<button type="button" class="pat-btn${p.key===myKey()?' on':''}" style="border-color:${p.key===myKey()?c:'var(--bd)'}" onclick="switchPatient('${p.key}')">
+          <div class="pat-btn-ic" style="background:${c}">${getInitial(p.nom)}</div>
+          <div class="pat-btn-nm">${p.nom}</div>
+        </button>`;
+      }).join('')}
+    </div>`);
+}
+
+function switchPatient(key) {
+  setCfg({ ...getCfg(), myPatientKey: key });
+  closeSheet();
+  applyTheme();
+  loadAppts();
+  toast('✓ Usuari canviat');
+}
+
+// ══ SHEET ═════════════════════════════════════════
+function openSheet(html) {
+  document.getElementById('sh-body').innerHTML = html;
+  document.getElementById('sheet').classList.add('on');
+  document.getElementById('ov').classList.add('on');
+}
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('on');
+  document.getElementById('ov').classList.remove('on');
+  editingId = null;
+}
+
+// ══ SETUP ═════════════════════════════════════════
+function renderSetup() {
+  const el = document.getElementById('setup');
+  el.style.display = 'flex';
+  const pts = getPatients();
+  el.innerHTML = `<div class="setup-box">
+    <div class="setup-logo">
+      <div class="setup-logo-ic">🏥</div>
+      <div class="setup-t">LaNostraSalut</div>
+      <div class="setup-s">Les meves cites mèdiques</div>
+    </div>
+    <div class="setup-sec">
+      <div class="setup-sec-t">Qui ets?</div>
+      <div class="pat-grid">
+        ${pts.map((p,i) => {
+          const c = PAL[i%PAL.length];
+          return `<button type="button" class="pat-btn" style="--pc:${c}" onclick="selectPatient('${p.key}',this)" data-key="${p.key}">
+            <div class="pat-btn-ic" style="background:${c}">${getInitial(p.nom)}</div>
+            <div class="pat-btn-nm">${p.nom}</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>
+    <button class="btn-pri" id="su-btn" disabled onclick="saveSetup()">Entrar →</button>
+  </div>`;
+}
+
+let _setupKey = '';
+function selectPatient(key, btn) {
+  _setupKey = key;
+  const pts = getPatients();
+  const idx = pts.findIndex(p => p.key === key);
+  const c   = PAL[idx >= 0 ? idx : 0];
+  document.querySelectorAll('.pat-btn').forEach(b => {
+    b.classList.remove('on');
+    b.style.borderColor = 'var(--bd)';
+  });
+  btn.classList.add('on');
+  btn.style.borderColor = c;
+  const sb = document.getElementById('su-btn');
+  if (sb) { sb.disabled = false; sb.style.background = c; }
+}
+
+async function saveSetup() {
+  if (!_setupKey) return;
+  setCfg({ ...getCfg(), myPatientKey: _setupKey });
+  document.getElementById('setup').style.display = 'none';
+  applyTheme();
+  const ok = await initDB();
+  if (ok) await loadAppts();
+  else toast('❌ Error de connexió');
+}
+
+// ══ TOAST ═════════════════════════════════════════
+let _t;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(_t);
+  _t = setTimeout(() => el.classList.remove('on'), 2600);
+}
+
+// ══ INIT ══════════════════════════════════════════
+async function init() {
+  if (!getCfg().myPatientKey) {
+    renderSetup();
+    return;
+  }
+  applyTheme();
+  const ok = await initDB();
+  if (ok) await loadAppts();
+  else toast('❌ Error de connexió');
+}
+
+init();
+</script>
+</body>
+</html>
