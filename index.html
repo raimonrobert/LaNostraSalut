@@ -1052,7 +1052,7 @@ function togglePast() { showPast = !showPast; renderList(); }
 
 function getAbbrev(nom) {
   const n = (nom||'?').trim();
-  return n.length <= 5 ? n : n.slice(0, 4) + '.';
+  return n.length <= 9 ? n : n.slice(0, 8) + '.';
 }
 
 function availIconsRow(a) {
