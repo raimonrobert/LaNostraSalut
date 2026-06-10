@@ -175,6 +175,20 @@ details summary::-webkit-details-marker { display:none; }
 .avail-btn[data-av=acompanyo].on  { border-color:var(--ok,var(--assi-c)); color:var(--ok,var(--assi-c)); background:color-mix(in srgb,var(--ok,var(--assi-c)) 14%,transparent); }
 .avail-btn:hover:not(.on) { border-color:var(--bd2); color:var(--tx); }
 
+/* Fila d'icones de disponibilitat de tothom (a la card) */
+.avail-icons-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; width:100%; margin-bottom:8px; }
+.avail-icons-lbl { font-size:11px; color:var(--mu); margin-right:2px; }
+.avail-icon {
+  height:24px; padding:0 9px; border-radius:12px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:800; color:#0b0d14;
+  border:1px solid var(--s1); white-space:nowrap;
+}
+.avail-icon[data-av=""]          { background:var(--s3); color:var(--mu2); border-color:var(--bd); }
+.avail-icon[data-av=impossible]  { background:var(--urgencies); }
+.avail-icon[data-av=potser]      { background:var(--warn); }
+.avail-icon[data-av=acompanyo]   { background:var(--ok); }
+
 /* Badge "no cal acompanyant" */
 .no-comp-badge {
   font-size:13px; font-weight:700; padding:5px 12px; border-radius:6px;
@@ -1036,6 +1050,21 @@ function renderList() {
 
 function togglePast() { showPast = !showPast; renderList(); }
 
+function getAbbrev(nom) {
+  const n = (nom||'?').trim();
+  return n.length <= 5 ? n : n.slice(0, 4) + '.';
+}
+
+function availIconsRow(a) {
+  const availability = a.availability || {};
+  const companions = getCompanions();
+  const icons = companions.map(name => {
+    const av = availability[name] || (a.companion === name ? 'acompanyo' : '');
+    return `<span class="avail-icon" data-av="${av}" title="${name}: ${av==='acompanyo'?'Acompanya':av==='impossible'?'Impossible':av==='potser'?'Potser':'Sense respondre'}">${getAbbrev(name)}</span>`;
+  }).join('');
+  return `<div class="avail-icons-row" onclick="event.stopPropagation()">${icons}</div>`;
+}
+
 function card(a, delay) {
   const rel = getREL();
   const r   = rel[a.relative] || { nom: a.relative, icon: '👤', color: '#888' };
@@ -1052,12 +1081,15 @@ function card(a, delay) {
     ? `<span class="ptag" style="--c:${c}">${patIc(r.nom,c,'xs')} ${r.nom}</span>`
     : '';
 
-  let cmpHtml;
+  let cmpHtml = '';
+  let iconsHtml = '';
   if (noNeed) {
     cmpHtml = `<span class="no-comp-badge">✓ No cal acompanyant</span>`;
   } else if (!noCmp) {
     cmpHtml = `<span class="companion-nm${isMe?' me':''}">👤 ${a.companion}</span>`;
+    iconsHtml = availIconsRow(a);
   } else {
+    iconsHtml = availIconsRow(a);
     cmpHtml = `<div class="avail-row" onclick="event.stopPropagation()">
       ${[['impossible','Impossible'],['potser','Potser'],['acompanyo','Acompanyo']].map(([k,lbl]) =>
         `<button class="avail-btn ${myAvail===k?'on':''}" data-av="${k}" onclick="setAvailability('${a.id}','${k}')">${lbl}</button>`
@@ -1077,6 +1109,7 @@ function card(a, delay) {
       </div>
       <div class="card-spec">${a.specialty||'<span style="color:var(--mu)">Sense especialitat</span>'}</div>
       ${a.doctor||a.center ? `<div class="card-sub">${[a.doctor,a.center].filter(Boolean).join(' · ')}</div>` : ''}
+      ${iconsHtml}
       <div class="card-foot">
         ${cmpHtml}
         <span class="spill" data-st="${a.status||'pendent'}">${ST_LBL[a.status||'pendent']}</span>
