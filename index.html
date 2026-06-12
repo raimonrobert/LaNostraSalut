@@ -9,6 +9,7 @@
 <title>LaNostraSalut</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 /* ══ TOKENS ══════════════════════════════════════════════ */
 :root {
@@ -660,6 +661,18 @@ select.fi { cursor:pointer; appearance:none; }
 const SUPABASE_URL = 'https://vzjyrdjdvbgqefqwekcs.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6anlyZGpkdmJncWVmcXdla2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MzE0MDYsImV4cCI6MjA5NjUwNzQwNn0.B5xCOceo789RpOPr9kzUAReH2p2JFX9gd6--vxFkysc';
 const SIBLINGS    = ['Raimon','Anna','Marc','Montse','Mohammed']; // ← edita aquesta llista
+
+// EmailJS — notificacions per email quan es crea una cita nova
+const EMAILJS_PUBLIC_KEY  = '1aCyiXhSaOvahuCK2';
+const EMAILJS_SERVICE_ID  = 'service_admmrkk';
+const EMAILJS_TEMPLATE_ID = 'template_keiumvz';
+const COMPANION_EMAILS = {
+  'Raimon':   'raimonrobert@gmail.com',
+  'Anna':     'annarobjan@gmail.com',
+  'Marc':     'marcrobertjane@gmail.com',
+  'Montse':   'montseroja@gmail.com',
+  'Mohammed': 'bechri28@gmail.com',
+};
 // ══════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════
@@ -1440,12 +1453,41 @@ async function submitForm() {
   };
   if (noNeed) payload.availability = {};
 
+  const isNew = !editingId;
   const result = await dbSave(payload);
   if (result) {
     await loadAppts();
     closeSheet();
     toast(editingId ? '✓ Cita actualitzada' : '✓ Cita afegida');
+    if (isNew) notifyNewAppointment(result);
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// NOTIFICACIONS PER EMAIL
+// ══════════════════════════════════════════════════════════
+function notifyNewAppointment(a) {
+  const { myName } = getCfg();
+  const rel = getREL();
+  const patientName = (rel[a.relative] || {}).nom || a.relative;
+
+  const recipients = getCompanions().filter(name => name !== myName);
+
+  recipients.forEach(name => {
+    const email = COMPANION_EMAILS[name];
+    if (!email) return;
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: email,
+      creator_name: myName || 'Algú',
+      patient_name: patientName,
+      appt_date: fullDate(a.date),
+      appt_time: a.time || 'Sense hora',
+      appt_specialty: a.specialty || '—',
+      appt_center: a.center || '—',
+      appt_coverage: COV_LBL[a.coverage || 'lameva'],
+      appt_notes: a.notes_pre || '—',
+    }).catch(err => console.error('EmailJS error:', err));
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1640,6 +1682,7 @@ function toast(msg) {
 // INIT
 // ══════════════════════════════════════════════════════════
 async function init() {
+  try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch {}
   if (!isConfigured()) {
     renderSetup();
     return;
