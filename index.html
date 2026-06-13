@@ -1491,7 +1491,7 @@ function sendWhatsAppReminder(e) {
 
   if (!pending.length) { toast('No hi ha cites pendents'); return; }
 
-  let text = `*LaNostraSalut* - cites sense acompanyant:\n\n`;
+  let text = `*Cites sense acompanyant:*\n\n`;
   pending.forEach(a => {
     const patientName = (rel[a.relative] || {}).nom || a.relative;
     const spec = a.specialty ? ` - ${a.specialty}` : '';
