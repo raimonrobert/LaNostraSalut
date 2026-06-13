@@ -290,6 +290,14 @@ details summary::-webkit-details-marker { display:none; }
 }
 .pending-banner:hover { background: color-mix(in srgb, var(--warn) 16%, transparent); }
 .banner-cta { margin-left:auto; font-size:13px; font-weight:700; }
+.pending-banner-actions { display:flex; align-items:center; gap:8px; width:100%; }
+.pending-banner-txt { flex:1; }
+.btn-wa {
+  flex-shrink:0; display:flex; align-items:center; gap:6px;
+  background:#25D366; color:#06301a; border:none; border-radius:8px;
+  padding:8px 12px; font-size:13px; font-weight:800; cursor:pointer; transition:opacity .2s;
+}
+.btn-wa:hover { opacity:.85; }
 .name-btn {
   padding:14px 10px; border-radius:12px; border:2px solid var(--bd);
   background:var(--s2); color:var(--mu2); font-size:15px; font-weight:700;
@@ -576,8 +584,9 @@ select.fi { cursor:pointer; appearance:none; }
 .mgmt-nm   { flex:1; font-size:14px; font-weight:600; }
 .mgmt-rm   { font-size:18px; color:var(--mu); cursor:pointer; transition:color .2s; background:none; border:none; padding:4px 6px; border-radius:6px; }
 .mgmt-rm:hover { color:var(--urgencies); background:color-mix(in srgb,var(--urgencies) 10%,transparent); }
-.add-row   { display:flex; gap:8px; margin-top:6px; align-items:center; }
-.add-row .fi { flex:1; padding:10px 12px; }
+.add-row   { display:flex; gap:8px; margin-top:6px; align-items:center; flex-wrap:wrap; }
+.add-row .fi { flex:1; min-width:110px; padding:10px 12px; }
+.add-row .btn-add { flex-shrink:0; }
 .btn-add   { padding:10px 16px; border-radius:10px; border:none; background:var(--s3); color:var(--mu2); font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .2s; }
 .btn-add:hover { background:var(--bd2); color:var(--tx); }
 .icon-pick { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:8px; }
@@ -681,8 +690,8 @@ const COMPANION_EMAILS = {
 const PAL = ['#5b9cf6','#f06ba0','#f59a3a','#2dd4bf','#c084fc','#34d399','#fb923c','#38bdf8'];
 
 const DEFAULT_PATIENTS = [
-  { key:'pare',  nom:'Pare'      },
-  { key:'mare',  nom:'Mare'      },
+  { key:'pare',  nom:'Ramon'     },
+  { key:'mare',  nom:'Mercè'     },
   { key:'oncle', nom:'Josep'     },
   { key:'p4',    nom:'Mohammed'  },
 ];
@@ -694,6 +703,10 @@ function patIc(nom, color, size='sm') {
 
 function getPatients() { return getCfg().patientsList || DEFAULT_PATIENTS; }
 function getCompanions() { return getCfg().companions || SIBLINGS; }
+function getCompanionEmail(name) {
+  const cfg = getCfg();
+  return (cfg.companionEmails || {})[name] || COMPANION_EMAILS[name] || '';
+}
 
 function getREL() {
   const rel = {};
@@ -1051,9 +1064,14 @@ function renderList() {
   // Banner de cites sense acompanyant (només quan filtre = Tots)
   const pendingCount = appts.filter(a => a.date >= t0 && !a.companion && a.status !== 'realitzada' && !a.no_companion_needed).length;
   const bannerHtml = (filterCompanion === 'tots' && filter === 'tots' && pendingCount > 0)
-    ? `<div class="pending-banner" onclick="setFilterCompanionById('sense')">
-        ⚠️ <strong>${pendingCount} cita${pendingCount>1?'es':''}</strong> sense acompanyant assignat
-        <span class="banner-cta">Veure →</span>
+    ? `<div class="pending-banner">
+        <div class="pending-banner-actions">
+          <span class="pending-banner-txt" onclick="setFilterCompanionById('sense')">
+            ⚠️ <strong>${pendingCount} cita${pendingCount>1?'es':''}</strong> sense acompanyant assignat
+            <span class="banner-cta">Veure →</span>
+          </span>
+          <button class="btn-wa" onclick="sendWhatsAppReminder(event)">📲 WhatsApp</button>
+        </div>
        </div>`
     : '';
 
@@ -1463,6 +1481,28 @@ async function submitForm() {
   }
 }
 
+function sendWhatsAppReminder(e) {
+  e.stopPropagation();
+  const t0 = today();
+  const rel = getREL();
+  const pending = appts
+    .filter(a => a.date >= t0 && !a.companion && a.status !== 'realitzada' && !a.no_companion_needed)
+    .sort((a,b) => a.date.localeCompare(b.date) || (a.time||'').localeCompare(b.time||''));
+
+  if (!pending.length) { toast('No hi ha cites pendents'); return; }
+
+  let text = `*LaNostraSalut* - cites sense acompanyant:\n\n`;
+  pending.forEach(a => {
+    const patientName = (rel[a.relative] || {}).nom || a.relative;
+    const spec = a.specialty ? ` - ${a.specialty}` : '';
+    text += `*${shortDate(a.date)}${a.time ? ' · '+a.time : ''}*\n${patientName}${spec}\n\n`;
+  });
+  text += `Mira l'app i marca si pots, potser o no: https://la-nostra-salut.vercel.app`;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+}
+
 // ══════════════════════════════════════════════════════════
 // NOTIFICACIONS PER EMAIL
 // ══════════════════════════════════════════════════════════
@@ -1474,7 +1514,7 @@ function notifyNewAppointment(a) {
   const recipients = getCompanions().filter(name => name !== myName);
 
   recipients.forEach(name => {
-    const email = COMPANION_EMAILS[name];
+    const email = getCompanionEmail(name);
     if (!email) return;
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
       to_email: email,
@@ -1526,13 +1566,14 @@ function openSettings() {
     </div>`
   ).join('');
 
-  const companionsHtml = sibs.map((s, i) =>
-    `<div class="mgmt-row">
+  const companionsHtml = sibs.map((s, i) => {
+    const email = getCompanionEmail(s);
+    return `<div class="mgmt-row">
       <span class="mgmt-ic" style="font-size:16px">👤</span>
-      <span class="mgmt-nm">${s}</span>
+      <span class="mgmt-nm">${s}${email?`<br><span style="font-size:11px;color:var(--mu);font-weight:400">${email}</span>`:''}</span>
       <button class="mgmt-rm" onclick="removeCompanion(${i})" title="Eliminar">×</button>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
 
   openSheet(`
     <div class="sh-hdr">
@@ -1558,6 +1599,7 @@ function openSettings() {
       <div class="mgmt-list" id="cmp-list">${companionsHtml}</div>
       <div class="add-row">
         <input type="text" class="fi" id="new-cmp-nom" placeholder="Nom del nou acompanyant">
+        <input type="email" class="fi" id="new-cmp-email" placeholder="Email (per avisos)">
         <button class="btn-add" onclick="addCompanion()">+ Afegir</button>
       </div>
     </div>
@@ -1599,18 +1641,28 @@ function addPatient() {
 }
 function removeCompanion(i) {
   const cmps = [...getCompanions()];
-  cmps.splice(i, 1);
-  setCfg({ ...getCfg(), companions: cmps });
+  const [removed] = cmps.splice(i, 1);
+  const cfg = getCfg();
+  const companionEmails = { ...(cfg.companionEmails || {}) };
+  delete companionEmails[removed];
+  setCfg({ ...cfg, companions: cmps, companionEmails });
   openSettings();
+  renderCompanionPills();
 }
 function addCompanion() {
   const nom = document.getElementById('new-cmp-nom')?.value.trim();
+  const email = document.getElementById('new-cmp-email')?.value.trim();
   if (!nom) { toast('⚠️ Escriu el nom de l\'acompanyant'); return; }
   const cmps = [...getCompanions()];
   if (cmps.includes(nom)) { toast('⚠️ Ja existeix aquest nom'); return; }
   cmps.push(nom);
-  setCfg({ ...getCfg(), companions: cmps });
+  const cfg = getCfg();
+  const companionEmails = { ...(cfg.companionEmails || {}) };
+  if (email) companionEmails[nom] = email;
+  setCfg({ ...cfg, companions: cmps, companionEmails });
   openSettings();
+  renderCompanionPills();
+  toast(`✓ ${nom} afegit${email ? ' amb email' : ''}`);
 }
 
 function saveSettings() {
