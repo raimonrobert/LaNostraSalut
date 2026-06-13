@@ -721,7 +721,7 @@ function renderPills() {
   if (!sel) return;
   const patients = getPatients();
   sel.innerHTML =
-    `<option value="tots">👥 Tots els pacients</option>` +
+    `<option value="tots">👥 Pacients</option>` +
     patients.map(p => `<option value="${p.key}">${p.nom}</option>`).join('') +
     `<option value="passades">🗂 Cites passades</option>`;
   sel.value = filter;
@@ -741,7 +741,7 @@ function renderCompanionPills() {
   if (!sel) return;
   const companions = getCompanions();
   sel.innerHTML =
-    `<option value="tots">👤 Tots els acompanyants</option>` +
+    `<option value="tots">👤 Acompanyants</option>` +
     `<option value="sense">⚠️ Sense assignar</option>` +
     companions.map(c => `<option value="${c}">${c}</option>`).join('');
   sel.value = filterCompanion;
